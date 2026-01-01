@@ -1,3 +1,4 @@
+import torch
 from src.metrics.tracker import MetricTracker
 from src.trainer.base_trainer import BaseTrainer
 
@@ -26,6 +27,9 @@ class Trainer(BaseTrainer):
                 the dataloader (possibly transformed via batch transform),
                 model outputs, and losses.
         """
+        
+        batch['t'] = torch.rand(batch['x1'].shape[0]).to(self.device)
+        batch['x0'] = torch.randn_like(batch['x1'])
         batch = self.move_batch_to_device(batch)
         batch = self.transform_batch(batch)  # transform batch on device -- faster
 
@@ -34,11 +38,9 @@ class Trainer(BaseTrainer):
             metric_funcs = self.metrics["train"]
             self.optimizer.zero_grad()
 
-        outputs = self.model(**batch)
-        batch.update(outputs)
 
         all_losses = self.criterion(**batch)
-        batch.update(all_losses)
+        batch.update({'loss':all_losses})
 
         if self.is_train:
             batch["loss"].backward()  # sum of all losses is always called loss

@@ -67,8 +67,9 @@ class FlowMatching(nn.Module):
        return torch.mean((v - target).pow(2).sum(dim=dim))
     
     def sample(self, n_samples, method='dopri5', rtol=1e-5, atol=1e-5):
-        x0 = torch.randn([n_samples]+list(self.obs_dim))
-        t = torch.linspace(0,1,2)
+        self.device = next(self.parameters()).device
+        x0 = torch.randn([n_samples]+list(self.obs_dim), device=self.device)
+        t = torch.linspace(0,1,2, device=self.device)
         with torch.no_grad():
             return odeint(self.model, x0, t, rtol=rtol, atol=atol, method=method)[-1,:,:]
         
@@ -80,8 +81,9 @@ class FlowMatching(nn.Module):
 
         
     def logp(self, x1, n_samples=50, rtol=1e-05, atol=1e-05):
+        self.device = next(self.parameters()).device
         self.n_samples = n_samples
-        t = torch.linspace(0, 1, 2)
+        t = torch.linspace(0, 1, 2, device=self.device )
         phi, f = odeint(
             self.reversed_velocity_with_div, 
             (x1, torch.zeros((x1.shape[0], 1))), 

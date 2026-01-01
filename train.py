@@ -26,7 +26,7 @@ def main(config):
 
     project_config = OmegaConf.to_container(config)
     logger = setup_saving_and_logging(config)
-    writer = instantiate(config.writer, logger, project_config)
+    writer = instantiate(config.writer)( logger=logger, project_config=project_config)
 
     if config.trainer.device == "auto":
         device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -38,11 +38,12 @@ def main(config):
     dataloaders, batch_transforms = get_dataloaders(config, device)
 
     # build model architecture, then print to console
-    model = instantiate(config.model).to(device)
+    base_model = instantiate(config.base_model)
+    model = instantiate(base_model)(base_model).to(device)
     logger.info(model)
 
     # get function handles of loss and metrics
-    loss_function = instantiate(config.loss_function).to(device)
+    loss_function = model.criterion
     metrics = instantiate(config.metrics)
 
     # build optimizer, learning rate scheduler
