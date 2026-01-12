@@ -45,24 +45,42 @@ class FlowMatching(nn.Module):
         
         mean_div = torch.stack(div_estimates).mean(dim=0)
         return ((-v).detach(), mean_div)
+    
+    def sigma(self, t, x1=None):
+        return (1 - (1-self.sigma_min)*t)
+    
+    def dsigma_dt(self, t, x1):
+        return - (1-self.sigma_min)
+    
+    def mu(self, t, x1):
+        return t*x1
+    
+    def dmu_dt(self, t, x1):
+        return x1
 
-    def conditional_flow(self, t, x0, x1):
+    def conditional_flow(self, t, x, x1):
         """
         Computes \phi(t,x) = \sigma(t, x1)x + \mu(t, x1), where \phi(0,x) = x = x0
-        \sigma(t, x1) = 1 - (1-\sigma_{min})t
-        \mu(t, x1) = t*x1
         
         :param t: timestep. Float in [0,1].
         :param x0: starting point sampled from N(0, I).
         :param x1: observation
         """
-        dims = [1]*(len(x0.shape)-1)
+        dims = [1]*(len(x.shape)-1)
         t = t.view(-1, *dims)
-        return (1 - (1-self.sigma_min)*t)*x0 + t*x1
+        return self.sigma(t, x1)*x + self.mu(t, x1)
+    
+    def conditional_velocity(self, t, x, x1, eps=1e-7):
+        dims = [1]*(len(x.shape)-1)
+        t = t.view(-1, *dims)
+        return self.sigma(t, x1)/(self.dsigma_dt(t, x1) + eps)*(x-self.mu(t, x1)) + self.dmu_dt(t, x1)
+    
+    def target_velocity(self, t, x, x1):
+        return self.conditional_velocity(t, self.conditional_flow(t, x, x1), x1)
     
     def criterion(self, t, x0, x1):
        v = self.forward(t, x0, x1)
-       target = x1 - (1-self.sigma_min)*x0
+       target = self.target_velocity(t, x0, x1)
        dim = tuple(torch.arange(1, len(x0.shape)))
        return torch.mean((v - target).pow(2).sum(dim=dim))
     
@@ -110,4 +128,3 @@ class FlowMatching(nn.Module):
         result_info = result_info + f"\nTrainable parameters: {trainable_parameters}"
 
         return result_info
-        
